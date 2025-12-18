@@ -37,7 +37,8 @@ from shapely import get_coordinates
 from stormevents import StormEvent
 from stormevents.nhc.track import VortexTrack
 
-import stormworkflow.prep.wwm
+import stormworkflow.prep.wwm as wwm
+from importlib.resources import files
 # TODO: Later find a clean way to package this module from SCHISM from
 # src/Utility/Pre-Processing/STOFS-3D-Atl-shadow-VIMS/Pre_processing/Source_sink/Relocate/
 #from relocate_source_feeder import (
@@ -46,7 +47,7 @@ import stormworkflow.prep.wwm
 #)
 
 
-REFS = Path('/refs')
+REFS = files('stormworkflow.refs') #Path('/refs')
 
 
 logger = logging.getLogger(__name__)
@@ -107,6 +108,17 @@ def _fix_nwm_issues(ensemble_dir, hires_shapefile):
             _relocate_source_sink(pth, hires_shapefile)
 
 
+def _fix_spinup_issue(ensemble_dir):
+    spinup_dir = ensemble_dir / 'spinup'
+
+    nm_list = f90nml.read(spinup_dir / 'param.nml')
+    nm_list['opt']['dramp'] = 2.0
+    nm_list['opt']['drampbc'] = 2.0
+    nm_list['opt']['dramp_ss'] = 2.0
+    nm_list['opt']['drampwind'] = 2.0
+    nm_list.write(spinup_dir / 'param.nml', force=True)
+
+
 def _fix_hotstart_issue(ensemble_dir):
     hotstart_dirs = ensemble_dir.glob('runs/*')
     for pth in hotstart_dirs:
@@ -151,7 +163,7 @@ def main(args):
     model_start_time = datetime.strptime(date_1, '%Y%m%d%H')
     model_end_time = datetime.strptime(date_2, '%Y%m%d%H')
     perturb_start = datetime.strptime(date_3, '%Y%m%d%H')
-    spinup_time = timedelta(days=8)
+    spinup_time = timedelta(days=10)
 
     forcing_configurations = []
     forcing_configurations.append(
@@ -287,6 +299,7 @@ def main(args):
         }
     )
 
+    _fix_spinup_issue(workdir)
     _fix_hotstart_issue(workdir)
     _fix_veg_parameter_issue(workdir) # For newer SCHISM version
     if with_hydrology:

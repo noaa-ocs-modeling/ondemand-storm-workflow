@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --parsable
-#SBATCH --time=05:00:00
+#SBATCH --time=08:00:00
 #SBATCH --nodes=1
 #SBATCH --exclusive
 
@@ -14,7 +14,7 @@ analyze_ensemble \
     --ensemble-dir $ENSEMBLE_DIR \
     --tracks-dir $ENSEMBLE_DIR/track_files
 
-storm_roc_curve \
+storm_roc_ts_rel_curves \
     --storm ${storm} \
     --year ${year} \
     --leadtime ${hr_prelandfall} \

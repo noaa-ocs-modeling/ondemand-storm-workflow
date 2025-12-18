@@ -77,6 +77,8 @@ def _analyze(tracks_dir, analyze_dir, mann_coef):
     log_space = False  # use log-scale to keep depths positive
     training_runs = 'korobov'
     validation_runs = 'random'
+    # probabilistic analysis
+    markov_samples = 2000  # default was 10,000
     # PC parameters
     polynomial_order = 3
     # cross_validator = ShuffleSplit(n_splits=10, test_size=12, random_state=666)
@@ -111,6 +113,8 @@ def _analyze(tracks_dir, analyze_dir, mann_coef):
     show_plots = False
 
     storm_name = None
+
+    validate_surrogate_model = False #if True, split 70/30
 
     if log_space:
         output_directory = analyze_dir / f'log_k{k_neighbors}_p{idw_order}_n{mann_coef}'
@@ -163,14 +167,21 @@ def _analyze(tracks_dir, analyze_dir, mann_coef):
         )
     )
 
-    if len(numpy.unique(perturbations['type'][:])) == 1:
+#    if len(numpy.unique(perturbations['type'][:])) == 1:
+
+    if validate_surrogate_model:
         perturbations['type'][:] = numpy.random.choice(
             ['training', 'validation'], size=len(perturbations.run), p=[0.7, 0.3]
         )
         LOGGER.info('dividing 70/30% for training/testing the model')
 
-    training_perturbations = perturbations.sel(run=perturbations['type'] == 'training')
-    validation_perturbations = perturbations.sel(run=perturbations['type'] == 'validation')
+        training_perturbations = perturbations.sel(run=perturbations['type'] == 'training')
+        validation_perturbations = perturbations.sel(run=perturbations['type'] == 'validation')
+    else:
+        training_perturbations = perturbations.sel(run=perturbations['type'] == 'training')
+        validation_perturbations = perturbations.sel(run=perturbations['type'] == 'training')
+        LOGGER.info('using all members for training the model')
+        make_validation_plot = False
 
     if make_perturbations_plot:
         plot_perturbations(
@@ -222,7 +233,8 @@ def _analyze(tracks_dir, analyze_dir, mann_coef):
         validation_set = subset.sel(run=validation_perturbations['run'])
 
     LOGGER.info(f'total {training_set.shape} training samples')
-    LOGGER.info(f'total {validation_set.shape} validation samples')
+    if validate_surrogate_model:
+        LOGGER.info(f'total {validation_set.shape} validation samples')
 
     if node_status_mask == 'always_wet':
         training_set_adjusted = training_set.copy(deep=True)
@@ -360,6 +372,7 @@ def _analyze(tracks_dir, analyze_dir, mann_coef):
             distribution=distribution,
             training_set=validation_set,
             percentiles=percentiles,
+            sample_size=markov_samples,
             convert_from_log_scale=log_space,
             convert_from_depths=training_depth_adjust.values if log_space else use_depth,
             minimum_allowable_value=min_depth if use_depth else None,
@@ -382,6 +395,7 @@ def _analyze(tracks_dir, analyze_dir, mann_coef):
             surrogate_model=surrogate_model,
             distribution=distribution,
             training_set=validation_set,
+            sample_size=markov_samples,
             minimum_allowable_value=min_depth if use_depth else None,
             convert_from_log_scale=log_space,
             convert_from_depths=training_depth_adjust.values if log_space else use_depth,
